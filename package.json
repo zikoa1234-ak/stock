@@ -1,0 +1,19 @@
+{
+  "name": "stock-management-easypanel",
+  "version": "1.0.0",
+  "description": "Stock Management System for EasyPanel",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
