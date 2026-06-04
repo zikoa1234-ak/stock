@@ -1,0 +1,124 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  NORMAL_USER
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model User {
+  id        String   @id @default(uuid())
+  fullName  String
+  email     String   @unique
+  password  String
+  role      Role     @default(NORMAL_USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdItems     Item[]          @relation("ItemCreatedBy")
+  updatedItems     Item[]          @relation("ItemUpdatedBy")
+  stockMovements   StockMovement[]
+  createdCategories Category[]     @relation("CategoryCreatedBy")
+  updatedCategories Category[]     @relation("CategoryUpdatedBy")
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  updatedBy   String?
+
+  items      Item[]
+
+  createdByUser   User @relation("CategoryCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User? @relation("CategoryUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@index([name])
+}
+
+model Item {
+  id           String   @id @default(uuid())
+  sku          String   @unique
+  name         String
+  description  String?
+  categoryId   String
+  quantity     Int      @default(0)
+  minimumStock Int      @default(10)
+  unitPrice    Float    @default(0.0)
+  location     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdBy    String
+  updatedBy    String?
+
+  category      Category @relation(fields: [categoryId], references: [id])
+  createdByUser User     @relation("ItemCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?    @relation("ItemUpdatedBy", fields: [updatedBy], references: [id])
+  stockMovements StockMovement[]
+
+  @@index([sku])
+  @@index([name])
+  @@index([categoryId])
+  @@index([quantity])
+  @@index([createdAt])
+}
+
+model StockMovement {
+  id        String       @id @default(uuid())
+  itemId    String
+  type      MovementType
+  quantity  Int
+  reason    String?
+  createdBy String
+  createdAt DateTime     @default(now())
+
+  item      Item   @relation(fields: [itemId], references: [id])
+  user      User   @relation(fields: [createdBy], references: [id])
+
+  @@index([itemId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([createdBy])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  entityType  String
+  entityId    String?
+  userId      String
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([action])
+  @@index([entityType])
+  @@index([userId])
+  @@index([createdAt])
+}
