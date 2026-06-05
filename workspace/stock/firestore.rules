@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    function isManager() {
+      return isAuthenticated() && (getUserRole(request.auth.uid) == 'admin' || getUserRole(request.auth.uid) == 'manager');
+    }
+
+    function isStaffOrAbove() {
+      return isAuthenticated() && (getUserRole(request.auth.uid) in ['admin', 'manager', 'staff']);
+    }
+
+    function isActiveUser() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+
+    // ===== Users Collection =====
+    match /users/{userId} {
+      // Users can read their own profile
+      // Admins can read all user profiles
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isAdmin()
+      );
+
+      // Users can update their own profile (basic info only)
+      // Admins can update any user profile
+      allow write: if isAuthenticated() && (
+        (request.auth.uid == userId && 
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['displayName', 'phone', 'photoURL', 'updatedAt']))
+        ||
+        isAdmin()
+      );
+
+      // Only admins can create user profiles
+      allow create: if isAdmin();
+
+      // Only admins can delete user profiles
+      allow delete: if isAdmin();
+    }
+
+    // ===== Items Collection =====
+    match /items/{itemId} {
+      // All authenticated active users can read items
+      allow read: if isActiveUser();
+
+      // Admin and Manager can create items
+      allow create: if isManager() && isActiveUser();
+
+      // Admin and Manager can update items
+      allow update: if isManager() && isActiveUser();
+
+      // Only Admin can delete items
+      allow delete: if isAdmin();
+    }
+
+    // ===== Categories Collection =====
+    match /categories/{categoryId} {
+      allow read: if isActiveUser();
+      
+      // Only Admin and Manager can create/update categories
+      allow create: if isManager() && isActiveUser();
+      allow update: if isManager() && isActiveUser();
+      
+      // Only Admin can delete categories
+      allow delete: if isAdmin();
+    }
+
+    // ===== Stock Movements Collection =====
+    match /stockMovements/{movementId} {
+      allow read: if isActiveUser();
+      
+      // Staff and above can record movements
+      allow create: if isStaffOrAbove() && isActiveUser();
+      
+      // No updates or deletes on movements (audit trail)
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ===== Activity Logs Collection =====
+    match /activityLogs/{logId} {
+      // Admin and Manager can read activity logs
+      allow read: if isManager() && isActiveUser();
+      
+      // Only server-side writes (via Cloud Functions or client app with auth)
+      allow create: if isAuthenticated();
+      
+      // No updates or deletes on activity logs
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
