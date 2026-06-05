@@ -119,29 +119,23 @@ async function syncStockData() {
     
     console.log(`Syncing ${pendingData.length} items`);
     
-    // Send data to server
-    const response = await fetch('/api/sync', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(pendingData)
-    });
-    
-    if (response.ok) {
-      console.log('Sync successful');
-      await clearPendingData();
-      
-      // Send notification
-      self.registration.showNotification('Sync Complete', {
-        body: 'Stock data has been synchronized',
-        icon: 'images/icon-192.png',
-        badge: 'images/icon-192.png'
+    // For Netlify deployment - store in localStorage instead
+    try {
+      const clients = await self.clients.matchAll();
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'SYNC_DATA',
+          data: pendingData
+        });
       });
-    }
+      console.log('Data sent to client for local storage');
+      await clearPendingData();
+  } catch (error) {
+      console.error('Sync to client failed:', error);
+  }
   } catch (error) {
     console.error('Sync failed:', error);
-  }
+}
 }
 
 // Push notifications
