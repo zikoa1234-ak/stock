@@ -2,12 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/store/AuthContext';
 import { ThemeProvider } from '@/store/ThemeContext';
+import { ToastProvider } from '@/store/ToastContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { SignUpPage } from '@/pages/auth/SignUpPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { InventoryPage } from '@/pages/inventory/InventoryPage';
+import { AddItemPage } from '@/pages/inventory/AddItemPage';
 import { MovementsPage } from '@/pages/movements/MovementsPage';
 import { UsersPage } from '@/pages/users/UsersPage';
 import { CategoriesPage } from '@/pages/categories/CategoriesPage';
@@ -81,6 +83,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/add" element={<AddItemPage />} />
         <Route path="movements" element={<MovementsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="categories" element={<CategoriesPage />} />

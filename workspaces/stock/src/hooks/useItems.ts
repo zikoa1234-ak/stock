@@ -1,21 +1,28 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+"import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   getItems,
   getItemById,
-  getAllItems,
   createItem,
   updateItem,
   archiveItem as archiveItemService,
   restoreItem as restoreItemService,
-  deleteItemPermanently,
-  getLowStockItems,
-  getCategories,
-  adjustStock,
+  deleteItem as deleteItemService,
+  getLowStockItems as getLowStockItemsService,
+  getCategories as getCategoriesService,
+  adjustStock as adjustStockService,
+  getAllItems,
 } from '@/services/inventory';
+import type { InventoryItem, ItemFormData, FilterState, SortState, StockAdjustment } from '@/types';
 import { useToast } from '@/store/ToastContext';
-import type { InventoryItem, ItemFormData, FilterState, SortState } from '@/types';
 
-export function useItems(params?: { filter?: FilterState; sort?: SortState; page?: number; pageSize?: number }) {
+// ===== Hook: useItems =====
+export function useItems(params?: {
+  filter?: FilterState;
+  sort?: SortState;
+  page?: number;
+  pageSize?: number;
+}) {
   return useQuery({
     queryKey: ['items', params],
     queryFn: () => getItems(params),
@@ -23,6 +30,7 @@ export function useItems(params?: { filter?: FilterState; sort?: SortState; page
   });
 }
 
+// ===== Hook: useItem =====
 export function useItem(id: string | undefined) {
   return useQuery({
     queryKey: ['item', id],
@@ -31,6 +39,7 @@ export function useItem(id: string | undefined) {
   });
 }
 
+// ===== Hook: useAllItems =====
 export function useAllItems() {
   return useQuery({
     queryKey: ['items', 'all'],
@@ -39,25 +48,29 @@ export function useAllItems() {
   });
 }
 
+// ===== Hook: useLowStockItems =====
 export function useLowStockItems() {
   return useQuery({
     queryKey: ['items', 'low-stock'],
-    queryFn: getLowStockItems,
+    queryFn: getLowStockItemsService,
     refetchInterval: 30000,
   });
 }
 
+// ===== Hook: useCategories =====
 export function useItemCategories() {
   return useQuery({
     queryKey: ['item-categories'],
-    queryFn: getCategories,
+    queryFn: getCategoriesService,
     staleTime: 60000,
   });
 }
 
+// ===== Hook: useCreateItem =====
 export function useCreateItem() {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
   return useMutation({
     mutationFn: (data: ItemFormData) => createItem(data),
     onSuccess: () => {
@@ -70,9 +83,11 @@ export function useCreateItem() {
   });
 }
 
+// ===== Hook: useUpdateItem =====
 export function useUpdateItem() {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<InventoryItem> }) => updateItem(id, data),
     onSuccess: (_, { id }) => {
@@ -86,9 +101,11 @@ export function useUpdateItem() {
   });
 }
 
+// ===== Hook: useArchiveItem =====
 export function useArchiveItem() {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
   return useMutation({
     mutationFn: (id: string) => archiveItemService(id),
     onSuccess: () => {
@@ -101,9 +118,11 @@ export function useArchiveItem() {
   });
 }
 
+// ===== Hook: useRestoreItem =====
 export function useRestoreItem() {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
   return useMutation({
     mutationFn: (id: string) => restoreItemService(id),
     onSuccess: () => {
@@ -116,11 +135,13 @@ export function useRestoreItem() {
   });
 }
 
+// ===== Hook: useDeleteItem =====
 export function useDeleteItem() {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
   return useMutation({
-    mutationFn: (id: string) => deleteItemPermanently(id),
+    mutationFn: (id: string) => deleteItemService(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items'] });
       addToast({ title: 'Item Deleted', message: 'Item has been permanently deleted.', type: 'warning' });
@@ -131,13 +152,16 @@ export function useDeleteItem() {
   });
 }
 
+// ===== Hook: useAdjustStock =====
 export function useAdjustStock() {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
   return useMutation({
-    mutationFn: ({ itemId, newQuantity }: { itemId: string; newQuantity: number }) => adjustStock(itemId, newQuantity),
+    mutationFn: (adjustment: StockAdjustment) => adjustStockService(adjustment.itemId, adjustment.newQuantity),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['item'] });
       addToast({ title: 'Stock Adjusted', message: 'Stock quantity has been updated.', type: 'success' });
     },
     onError: (error: any) => {
@@ -145,3 +169,4 @@ export function useAdjustStock() {
     },
   });
 }
+"

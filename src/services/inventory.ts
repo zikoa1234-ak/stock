@@ -10,142 +10,96 @@ import {
   where,
   orderBy,
   limit,
-  startAfter,
   serverTimestamp,
-  Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { InventoryItem } from '@/types';
+import { db, auth } from '@/lib/firebase';
+import type { InventoryItem, ItemFormData, FilterState, SortState } from '@/types';
+
+const ITEMS_PER_PAGE = 50;
 
 export async function getItems(params?: {
-  categoryId?: string;
-  search?: string;
-  sortField?: string;
-  sortDirection?: 'asc' | 'desc';
+  filter?: FilterState;
+  sort?: SortState;
+  page?: number;
   pageSize?: number;
-  lastDoc?: any;
-}) {
-  let q = query(collection(db, 'items'), orderBy('createdAt', 'desc'));
-  
-  if (params?.categoryId) {
-    q = query(q, where('categoryId', '==', params.categoryId));
+}): Promise<{ items: InventoryItem[]; total: number }> {
+  const conditions: any[] = [];
+  if (params?.filter?.status === 'active') conditions.push(where('status', '==', 'active'));
+  else if (params?.filter?.status === 'archived') conditions.push(where('status', '==', 'archived'));
+  if (params?.filter?.category) conditions.push(where('category', '==', params.filter.category));
+  const sortField = params?.sort?.field || 'name';
+  const sortDir = params?.sort?.direction === 'desc' ? 'desc' : 'asc';
+  conditions.push(orderBy(sortField, sortDir));
+  conditions.push(limit(params?.pageSize || ITEMS_PER_PAGE));
+  const snapshot = await getDocs(query(collection(db, 'items'), ...conditions));
+  let items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
+  if (params?.filter?.search) {
+    const s = params.filter.search.toLowerCase();
+    items = items.filter(i => i.name.toLowerCase().includes(s) || i.sku.toLowerCase().includes(s) || i.supplier?.toLowerCase().includes(s) || i.barcode?.toLowerCase().includes(s) || i.location?.toLowerCase().includes(s));
   }
-  
-  if (params?.pageSize) {
-    q = query(q, limit(params.pageSize));
-  }
-  
-  if (params?.lastDoc) {
-    q = query(q, startAfter(params.lastDoc));
-  }
-
-  const snapshot = await getDocs(q);
-  const items = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as InventoryItem[];
-
-  // Client-side search filter
-  let filtered = items;
-  if (params?.search) {
-    const searchLower = params.search.toLowerCase();
-    filtered = items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(searchLower) ||
-        item.sku.toLowerCase().includes(searchLower) ||
-        item.supplier?.toLowerCase().includes(searchLower)
-    );
-  }
-
-  // Client-side sort
-  if (params?.sortField) {
-    filtered.sort((a: any, b: any) => {
-      const aVal = a[params.sortField!];
-      const bVal = b[params.sortField!];
-      const dir = params.sortDirection === 'asc' ? 1 : -1;
-      if (aVal < bVal) return -1 * dir;
-      if (aVal > bVal) return 1 * dir;
-      return 0;
-    });
-  }
-
-  return {
-    items: filtered,
-    lastDoc: snapshot.docs[snapshot.docs.length - 1],
-    total: filtered.length,
-  };
+  return { items, total: items.length };
 }
 
-export async function getItem(id: string): Promise<InventoryItem | null> {
-  const docRef = doc(db, 'items', id);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as InventoryItem;
-  }
-  return null;
+export async function getItemById(id: string): Promise<InventoryItem | null> {
+  const snap = await getDoc(doc(db, 'items', id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } as InventoryItem : null;
 }
 
-export async function createItem(item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) {
+export async function createItem(data: ItemFormData): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
   const docRef = await addDoc(collection(db, 'items'), {
-    ...item,
+    ...data,
+    status: 'active',
+    createdBy: user.uid,
+    updatedBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
   return docRef.id;
 }
 
-export async function updateItem(id: string, data: Partial<InventoryItem>) {
-  const docRef = doc(db, 'items', id);
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
+export async function updateItem(id: string, data: Partial<InventoryItem>): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  await updateDoc(doc(db, 'items', id), { ...data, updatedBy: user.uid, updatedAt: serverTimestamp() });
 }
 
-export async function deleteItem(id: string) {
+export async function deleteItemPermanently(id: string): Promise<void> {
   await deleteDoc(doc(db, 'items', id));
 }
 
+export async function archiveItem(id: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  await updateDoc(doc(db, 'items', id), { status: 'archived', updatedBy: user.uid, updatedAt: serverTimestamp() });
+}
+
+export async function restoreItem(id: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  await updateDoc(doc(db, 'items', id), { status: 'active', updatedBy: user.uid, updatedAt: serverTimestamp() });
+}
+
+export async function adjustStock(itemId: string, newQuantity: number): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  await updateDoc(doc(db, 'items', itemId), { quantity: newQuantity, updatedBy: user.uid, updatedAt: serverTimestamp() });
+}
+
 export async function getLowStockItems(): Promise<InventoryItem[]> {
-  const q = query(
-    collection(db, 'items'),
-    where('quantity', '<=', 0),
-    orderBy('quantity', 'asc'),
-    limit(100)
-  );
-  const snapshot = await getDocs(q);
-  const outOfStock = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as InventoryItem[];
-
-  // Get items where quantity > 0 but <= minStock
-  const allItems = await getAllItems();
-  const lowStock = allItems.filter(
-    (item) => item.quantity > 0 && item.quantity <= item.minStock
-  );
-
-  return [...lowStock, ...outOfStock];
+  const snapshot = await getDocs(query(collection(db, 'items'), where('status', '==', 'active'), orderBy('quantity', 'asc'), limit(100)));
+  const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
+  return items.filter(i => i.quantity <= i.minStock || i.quantity <= 0);
 }
-
 export async function getAllItems(): Promise<InventoryItem[]> {
-  const q = query(collection(db, 'items'), orderBy('name', 'asc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as InventoryItem[];
+  const snapshot = await getDocs(query(collection(db, 'items'), where('status', '==', 'active'), orderBy('name', 'asc')));
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
 }
 
-export async function getItemsByIds(ids: string[]): Promise<InventoryItem[]> {
-  if (ids.length === 0) return [];
-  const q = query(
-    collection(db, 'items'),
-    where('__name__', 'in', ids.slice(0, 10)) // Firestore 'in' limit of 10
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as InventoryItem[];
+export async function getCategories(): Promise<string[]> {
+  const snapshot = await getDocs(query(collection(db, 'items'), where('status', '==', 'active')));
+  const cats = new Set<string>();
+  snapshot.docs.forEach(d => { const c = d.data().category; if (c) cats.add(c); });
+  return Array.from(cats).sort();
 }
