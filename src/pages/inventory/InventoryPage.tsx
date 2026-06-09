@@ -170,7 +170,7 @@ export function InventoryPage() {
                     </td>
                     <td className="px-4 py-3 text-surface-900 dark:text-surface-100">{formatCurrency(item.unitPrice)}</td>
                     <td className="px-4 py-3 text-surface-600 dark:text-surface-400">{item.supplier}</td>
-                    <td className="px-4 py-3 text-surface-600 dark:text-surface-400">{item.location}</td>
+                    <td className="px-4 py-3 text-surface-600 dark:text-surface-400">{item.storageLocation || item.location || '-'}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setViewingItem(item)} className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400" title="View"><Eye className="w-4 h-4" /></button>

@@ -5,12 +5,12 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useCreateItem, useUpdateItem, useItemCategories } from '@/hooks/useItems';
 import { useToast } from '@/store/ToastContext';
 import { Button } from '@/components/ui/Button';
-import type { InventoryItem, CreateItemInput } from '@/types';
+import type { InventoryItem } from '@/types';
 
 export function AddItemPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { showToast } = useToast();
+  const { addToast } = useToast();
 
   const editItem = (location.state as { editItem?: InventoryItem })?.editItem;
   const isEditing = !!editItem;
@@ -19,17 +19,17 @@ export function AddItemPage() {
   const updateItem = useUpdateItem();
   const { data: categories = [] } = useItemCategories();
 
-  const [formData, setFormData] = useState<CreateItemInput & { description?: string }>({
+  const [formData, setFormData] = useState({
     name: '',
     sku: '',
-    category: '',
+    categoryId: '',
     quantity: 0,
     minStock: 0,
     unitPrice: 0,
     supplier: '',
-    location: '',
+    storageLocation: '',
     barcode: '',
-    description: '',
+    notes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -38,14 +38,14 @@ export function AddItemPage() {
       setFormData({
         name: editItem.name,
         sku: editItem.sku,
-        category: editItem.category,
+        categoryId: editItem.categoryId,
         quantity: editItem.quantity,
         minStock: editItem.minStock,
         unitPrice: editItem.unitPrice,
         supplier: editItem.supplier,
-        location: editItem.location,
+        storageLocation: editItem.location,
         barcode: editItem.barcode || '',
-        description: editItem.description || '',
+        notes: editItem.notes || '',
       });
     }
   }, [editItem]);
@@ -54,7 +54,7 @@ export function AddItemPage() {
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.sku.trim()) newErrors.sku = 'SKU is required';
-    if (!formData.category) newErrors.category = 'Category is required';
+    if (!formData.categoryId) newErrors.categoryId = 'Category is required';
     if (formData.quantity < 0) newErrors.quantity = 'Quantity must be 0 or more';
     if (formData.minStock < 0) newErrors.minStock = 'Min stock must be 0 or more';
     if (formData.unitPrice < 0) newErrors.unitPrice = 'Price must be 0 or more';
@@ -68,18 +68,28 @@ export function AddItemPage() {
 
     try {
       if (isEditing && editItem) {
-        await updateItem.mutateAsync({
-          itemId: editItem.id,
-          data: formData,
-        });
-        showToast('Item updated successfully', 'success');
+        const updateData: Partial<InventoryItem> = {
+          name: formData.name,
+          sku: formData.sku,
+          categoryId: formData.categoryId,
+          quantity: formData.quantity,
+          minStock: formData.minStock,
+          unitPrice: formData.unitPrice,
+          supplier: formData.supplier,
+          location: formData.storageLocation,
+          storageLocation: formData.storageLocation,
+          barcode: formData.barcode || undefined,
+          notes: formData.notes || undefined,
+        };
+        await updateItem.mutateAsync({ id: editItem.id, data: updateData });
+        addToast({ title: 'Item Updated', message: 'Item has been updated successfully.', type: 'success' });
       } else {
         await createItem.mutateAsync(formData);
-        showToast('Item created successfully', 'success');
+        addToast({ title: 'Item Created', message: 'Item has been added successfully.', type: 'success' });
       }
       navigate('/inventory');
     } catch (err: any) {
-      showToast(err?.message || 'Failed to save item', 'error');
+      addToast({ title: 'Error', message: err?.message || 'Failed to save item', type: 'error' });
     }
   };
 
@@ -104,7 +114,7 @@ export function AddItemPage() {
         </button>
         <div>
           <h1 className="page-title">{isEditing ? 'Edit Item' : 'Add Item'}</h1>
-          <p className="page-subtitle">{isEditing ? 'Editing ' + editItem?.name : 'Create a new inventory item'}</p>
+          <p className="page-subtitle">{isEditing ? 'Editing ' + (editItem?.name || '') : 'Create a new inventory item'}</p>
         </div>
       </div>
 
@@ -115,49 +125,25 @@ export function AddItemPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                className={'input' + (errors.name ? ' border-red-500' : '')}
-                placeholder="Item name"
-              />
+              <input type="text" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} className={'input' + (errors.name ? ' border-red-500' : '')} placeholder="Item name" />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">SKU *</label>
-              <input
-                type="text"
-                value={formData.sku}
-                onChange={(e) => handleChange('sku', e.target.value)}
-                className={'input' + (errors.sku ? ' border-red-500' : '')}
-                placeholder="Stock keeping unit"
-              />
+              <input type="text" value={formData.sku} onChange={(e) => handleChange('sku', e.target.value)} className={'input' + (errors.sku ? ' border-red-500' : '')} placeholder="Stock keeping unit" />
               {errors.sku && <p className="text-red-500 text-xs mt-1">{errors.sku}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Category *</label>
-              <select
-                value={formData.category}
-                onChange={(e) => handleChange('category', e.target.value)}
-                className={'select' + (errors.category ? ' border-red-500' : '')}
-              >
+              <select value={formData.categoryId} onChange={(e) => handleChange('categoryId', e.target.value)} className={'select' + (errors.categoryId ? ' border-red-500' : '')}>
                 <option value="">Select category</option>
-                {categories.map((cat: string) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {categories.map((cat: string) => (<option key={cat} value={cat}>{cat}</option>))}
               </select>
-              {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
+              {errors.categoryId && <p className="text-red-500 text-xs mt-1">{errors.categoryId}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Barcode</label>
-              <input
-                type="text"
-                value={formData.barcode}
-                onChange={(e) => handleChange('barcode', e.target.value)}
-                className="input"
-                placeholder="Optional barcode"
-              />
+              <input type="text" value={formData.barcode} onChange={(e) => handleChange('barcode', e.target.value)} className="input" placeholder="Optional barcode" />
             </div>
           </div>
         </div>
@@ -168,36 +154,17 @@ export function AddItemPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Quantity *</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.quantity}
-                onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 0)}
-                className={'input' + (errors.quantity ? ' border-red-500' : '')}
-              />
+              <input type="number" min="0" value={formData.quantity} onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 0)} className={'input' + (errors.quantity ? ' border-red-500' : '')} />
               {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Min Stock *</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.minStock}
-                onChange={(e) => handleChange('minStock', parseInt(e.target.value) || 0)}
-                className={'input' + (errors.minStock ? ' border-red-500' : '')}
-              />
+              <input type="number" min="0" value={formData.minStock} onChange={(e) => handleChange('minStock', parseInt(e.target.value) || 0)} className={'input' + (errors.minStock ? ' border-red-500' : '')} />
               {errors.minStock && <p className="text-red-500 text-xs mt-1">{errors.minStock}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Unit Price *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.unitPrice}
-                onChange={(e) => handleChange('unitPrice', parseFloat(e.target.value) || 0)}
-                className={'input' + (errors.unitPrice ? ' border-red-500' : '')}
-              />
+              <input type="number" min="0" step="0.01" value={formData.unitPrice} onChange={(e) => handleChange('unitPrice', parseFloat(e.target.value) || 0)} className={'input' + (errors.unitPrice ? ' border-red-500' : '')} />
               {errors.unitPrice && <p className="text-red-500 text-xs mt-1">{errors.unitPrice}</p>}
             </div>
           </div>
@@ -209,46 +176,27 @@ export function AddItemPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Supplier</label>
-              <input
-                type="text"
-                value={formData.supplier}
-                onChange={(e) => handleChange('supplier', e.target.value)}
-                className="input"
-                placeholder="Supplier name"
-              />
+              <input type="text" value={formData.supplier} onChange={(e) => handleChange('supplier', e.target.value)} className="input" placeholder="Supplier name" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Location</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => handleChange('location', e.target.value)}
-                className="input"
-                placeholder="e.g. Warehouse A, Shelf 12"
-              />
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Storage Location</label>
+              <input type="text" value={formData.storageLocation} onChange={(e) => handleChange('storageLocation', e.target.value)} className="input" placeholder="e.g. Warehouse A, Shelf 12" />
             </div>
           </div>
         </div>
 
-        {/* Description */}
+        {/* Notes */}
         <div>
           <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">Additional</h2>
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Description</label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => handleChange('description', e.target.value)}
-              className="input min-h-[100px] resize-y"
-              placeholder="Optional description or notes"
-            />
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Notes</label>
+            <textarea value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} className="input min-h-[100px] resize-y" placeholder="Optional notes" />
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-surface-200 dark:border-surface-700">
-          <Button variant="secondary" onClick={() => navigate('/inventory')} disabled={isPending}>
-            Cancel
-          </Button>
+          <Button variant="secondary" onClick={() => navigate('/inventory')} disabled={isPending}>Cancel</Button>
           <Button type="submit" icon={isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} disabled={isPending}>
             {isPending ? 'Saving...' : isEditing ? 'Update Item' : 'Create Item'}
           </Button>

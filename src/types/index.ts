@@ -1,29 +1,72 @@
-"import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
-// ===== Roles & Permissions =====
 export type UserRole = 'admin' | 'manager' | 'staff' | 'viewer';
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 
-export interface Permission {
+export interface InventoryItem {
   id: string;
   name: string;
-  description: string;
+  sku: string;
+  category: string;
+  categoryId: string;
+  quantity: number;
+  minStock: number;
+  unitPrice: number;
+  supplier: string;
+  location: string;
+  storageLocation: string;
+  barcode?: string;
+  qrCode?: string;
+  notes?: string;
+  description?: string;
+  status: 'active' | 'archived';
+  imageUrl?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdBy: string;
+  lastUpdatedBy?: string;
 }
 
-export interface RolePermissions {
-  role: UserRole;
-  permissions: {
-    items: { create: boolean; read: boolean; update: boolean; delete: boolean };
-    categories: { create: boolean; read: boolean; update: boolean; delete: boolean };
-    users: { create: boolean; read: boolean; update: boolean; delete: boolean };
-    movements: { create: boolean; read: boolean; update: boolean; delete: boolean };
-    reports: { read: boolean; export: boolean };
-    settings: { read: boolean; update: boolean };
-    dashboard: { read: boolean };
-  };
+export type CreateItemInput = {
+  name: string;
+  sku: string;
+  category: string;
+  quantity: number;
+  minStock: number;
+  unitPrice: number;
+  supplier: string;
+  location: string;
+  barcode?: string;
+  description?: string;
+};
+
+export interface ItemFormData {
+  name: string;
+  sku: string;
+  categoryId: string;
+  quantity: number;
+  minStock: number;
+  unitPrice: number;
+  supplier: string;
+  storageLocation: string;
+  barcode?: string;
+  notes?: string;
 }
 
-// ===== User =====
+export interface FilterState {
+  search: string;
+  category?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  type?: string;
+}
+
+export interface SortState {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
 export interface AppUser {
   uid: string;
   email: string;
@@ -38,51 +81,12 @@ export interface AppUser {
   lastLogin?: Timestamp;
 }
 
-// ===== Category =====
-export interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  icon?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  createdBy: string;
-  isActive: boolean;
-}
-
-// ===== Item =====
-export interface InventoryItem {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  categoryId: string;
-  quantity: number;
-  minStock: number;
-  unitPrice: number;
-  supplier: string;
-  storageLocation: string;
-  barcode?: string;
-  qrCode?: string;
-  notes?: string;
-  imageUrl?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  createdBy: string;
-  lastUpdatedBy?: string;
-}
-
-// ===== Stock Movement =====
-export type MovementType = 'in' | 'out' | 'adjustment' | 'transfer';
-export type MovementStatus = 'completed' | 'pending' | 'cancelled';
-
 export interface StockMovement {
   id: string;
   itemId: string;
   itemName: string;
   sku: string;
-  type: MovementType;
+  type: 'in' | 'out' | 'adjustment' | 'transfer';
   quantity: number;
   previousQuantity: number;
   newQuantity: number;
@@ -90,7 +94,7 @@ export interface StockMovement {
   reference?: string;
   location?: string;
   targetLocation?: string;
-  status: MovementStatus;
+  status: 'completed' | 'pending' | 'cancelled';
   performedBy: string;
   performedByName: string;
   notes?: string;
@@ -98,21 +102,6 @@ export interface StockMovement {
   updatedAt: Timestamp;
 }
 
-// ===== Activity Log =====
-export interface ActivityLog {
-  id: string;
-  action: string;
-  entityType: 'user' | 'item' | 'category' | 'movement' | 'setting';
-  entityId: string;
-  entityName: string;
-  details: string;
-  performedBy: string;
-  performedByName: string;
-  severity: 'info' | 'warning' | 'error';
-  createdAt: Timestamp;
-}
-
-// ===== Dashboard Stats =====
 export interface DashboardStats {
   totalItems: number;
   totalStockQuantity: number;
@@ -124,7 +113,6 @@ export interface DashboardStats {
   recentMovements: number;
 }
 
-// ===== Chart Data =====
 export interface ChartDataPoint {
   date: string;
   stockIn: number;
@@ -144,7 +132,6 @@ export interface TopMovedItem {
   netChange: number;
 }
 
-// ===== Form Types =====
 export interface LoginFormData {
   email: string;
   password: string;
@@ -158,22 +145,9 @@ export interface SignUpFormData {
   displayName: string;
 }
 
-export interface ItemFormData {
-  name: string;
-  sku: string;
-  categoryId: string;
-  quantity: number;
-  minStock: number;
-  unitPrice: number;
-  supplier: string;
-  storageLocation: string;
-  barcode?: string;
-  notes?: string;
-}
-
 export interface MovementFormData {
   itemId: string;
-  type: MovementType;
+  type: 'in' | 'out' | 'adjustment' | 'transfer';
   quantity: number;
   reason: string;
   reference?: string;
@@ -196,7 +170,6 @@ export interface CategoryFormData {
   color?: string;
 }
 
-// ===== UI Types =====
 export interface PaginationState {
   page: number;
   pageSize: number;
@@ -204,21 +177,6 @@ export interface PaginationState {
   totalPages: number;
 }
 
-export interface SortState {
-  field: string;
-  direction: 'asc' | 'desc';
-}
-
-export interface FilterState {
-  search: string;
-  category?: string;
-  status?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  type?: string;
-}
-
-// ===== Notification =====
 export interface AppNotification {
   id: string;
   title: string;
@@ -227,4 +185,4 @@ export interface AppNotification {
   read: boolean;
   createdAt: Date;
   link?: string;
-}"
+}
